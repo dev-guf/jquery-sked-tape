@@ -35,11 +35,19 @@
             </div>
              <!-- EXAMPLE 1a -->
             <div class="mb-4">
-                <h2 class="mb-3">1a. Editing with blocks</h2>
+            	<h2 class="mb-3">1a. Editing with blocks</h2>
                 <div class="alert alert-primary mb-3">
                     In this version there is a block visible. Events can only be moved inside a block.
                 </div>
-                <div id="sked1a"></div>
+                <div style="margin: 5px;">
+            		Drag these events to the blocks:<br/>
+	                <div class="eventItem" style="background-color: gray; color: white; padding: 5px; cursor: pointer;">New event 1</div>
+	                <div class="eventItem" style="background-color: red; color: white; padding: 5px; cursor: pointer;">New event 2</div>
+                </div>
+                <div>
+                	<div id="sked1a">
+                	</div>
+				</div>	
             </div>
             <!-- EXAMPLE 2 -->
             <div class="mb-4">
@@ -228,6 +236,9 @@
                     end: today(13, 45)
                 },
             ];
+            
+            var overSked = false;
+            var selectedName, selectedId, selectedColor;
             // -------------------------- Helpers ------------------------------
             function today(hours, minutes) {
                 var date = new Date();
@@ -244,6 +255,35 @@
                 date.setTime(date.getTime() + 24 * 60 * 60 * 1000);
                 return date;
             }
+            function addToSked(sked) {
+				try {
+					sked.skedTape('addNewEvent', {
+						name: selectedName,
+						duration: 30 * 60 * 1000,
+						userData: {
+							customData: 'my data!',
+						}
+					});
+				}
+				catch (e) {
+					if (e.name !== 'SkedTape.CollisionError') throw e;
+				}
+				overSked = true;
+
+			}
+			function collisionChecker(activeDiv, anyOtherDiv) {
+				if (
+					(activeDiv.offset().left >= anyOtherDiv.offset().left) &&
+					(activeDiv.offset().left <= (anyOtherDiv.offset().left + anyOtherDiv.width())) &&
+					(activeDiv.offset().top >= anyOtherDiv.offset().top) &&
+					(activeDiv.offset().top <= (anyOtherDiv.offset().top + anyOtherDiv.height()))
+				) {
+					overlap = true;
+					return overlap;
+				} else {
+					return false
+				}
+			}
             // --------------------------- Example 1 ---------------------------
             var $sked1 = $('#sked1').skedTape({
                 caption: 'Cities',
@@ -384,6 +424,40 @@
             $skedTabBtn.on('hidden.bs.tab', function(e) {
                 $('#sked4').skedTape('destroy');
             });
+            
+            $('.eventItem').each(function(index, element) {
+
+            var item = $(this);
+            var skedTapes = [$sked1a];
+            $(this).draggable({
+                stack: "div", 
+                revert: true, 
+                appendTo: "body",
+                zIndex: 10000,
+                helper: "clone",
+                start: function(e, ui) {
+                    selectedId = $(this).attr('id');
+                    selectedColor = $(this).css('backgroundColor');	
+                    selectedName = $(this).html();	
+                },
+                drag: function(e, ui) {
+                    for (var i=0; i< skedTapes.length; i++) {
+                        if (collisionChecker($(ui.helper), skedTapes[i])) {
+                            addToSked(skedTapes[i]);
+                            ui.helper.remove();
+                        } 
+                    }
+                },
+                stop: function(e, ui) {
+                    if (overSked == false) {
+                        //sked.skedTape('cancelAdding', {
+
+                        //});
+                        ui.helper.remove();
+                    }
+                    overSked = false;
+            }});
+        });
         </script>
     </body>
 </html>
