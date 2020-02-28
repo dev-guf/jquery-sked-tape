@@ -1,7 +1,14 @@
 # jquery-sked-tape
 Schedule component for jQuery that represents events in tape manner.
+This version adds resizing and blocks. 
+
+Blocks allow you to set specific blocks where events can be planned. Useful for schedules with open and closing times.
+
+Events can be resized using jquery-ui's resizable. Events will be triggered where you can put or post your object. 
 
 [DEMO](https://lexkrstn.github.io/jquery-sked-tape/)
+
+![Alt text](demo-blocks.png?raw=true "Demo using blocks")
 
 ### API
 
