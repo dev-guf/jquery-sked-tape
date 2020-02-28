@@ -6,7 +6,7 @@ Blocks allow you to set specific blocks where events can be planned. Useful for 
 
 Events can be resized using jquery-ui's resizable. Events will be triggered where you can put or post your object. 
 
-[DEMO](https://lexkrstn.github.io/jquery-sked-tape/)
+[DEMO](https://dannygrob.github.io/jquery-sked-tape/)
 
 ![Alt text](demo-blocks.png?raw=true "Demo using blocks")
 
