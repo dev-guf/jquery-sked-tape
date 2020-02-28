@@ -1,4 +1,31 @@
-var CURRENT_TZ_OFFSET = new Date().getTimezoneOffset();
+(function (factory) {
+    if (typeof define === 'function' && define.amd) {
+        // AMD. Register as an anonymous module.
+        define(['jquery'], factory);
+    } else if (typeof module === 'object' && module.exports) {
+        // Node/CommonJS
+        module.exports = function( root, jQuery ) {
+            if ( jQuery === undefined ) {
+                // require('jQuery') returns a factory that requires window to
+                // build a jQuery instance, we normalize how we use modules
+                // that require this pattern but the window provided is a noop
+                // if it's defined (how jquery works)
+                if ( typeof window !== 'undefined' ) {
+                    jQuery = require('jquery');
+                }
+                else {
+                    jQuery = require('jquery')(root);
+                }
+            }
+            factory(jQuery);
+            return jQuery;
+        };
+    } else {
+        // Browser globals
+        factory(jQuery);
+    }
+}(function ($) {
+	var CURRENT_TZ_OFFSET = new Date().getTimezoneOffset();
 
 var SkedTape = function(opts) {
 	$.extend(this, opts);
@@ -6,16 +33,23 @@ var SkedTape = function(opts) {
 	this.$el = opts && opts.el ? $(opts.el) : $('<div/>');
 	this.el = opts.el instanceof $ ? opts.el[0] : opts.el;
 
+	this.isResizing = false;
+	this.addEventOffset = 0;
+	this.blocksEnabled = false;
+	this.blocks = [];
 	this.locations = [];
 	this.events = [];
 	this.lastEventId = 0;
 	this.format = $.extend({}, SkedTape.defaultFormatters, (opts && opts.formatters) || {});
 
 	this.$el.on('click', '.sked-tape__event', $.proxy(this.handleEventClick, this));
+	this.$el.on('mousedown', '.sked-tape__event', $.proxy(this.handleEventMouseDown, this));
 	this.$el.on('contextmenu', '.sked-tape__event', $.proxy(this.handleEventContextMenu, this));
 	this.$el.on('click', '.sked-tape__timeline-wrap', $.proxy(this.handleTimelineClick, this));
+	this.$el.on('mouseup', '.sked-tape__timeline-wrap', $.proxy(this.handleTimelineClick, this));
 	this.$el.on('contextmenu', '.sked-tape__timeline-wrap', $.proxy(this.handleTimelineContextMenu, this));
 	this.$el.on('mousemove', '.sked-tape__timeline-wrap', $.proxy(this.handleMouseMove, this));
+	this.$el.on('touchmove', '.sked-tape__timeline-wrap', $.proxy(this.handleMouseMove, this));
 	this.$el.on('keydown', '.sked-tape__time-frame', $.proxy(this.handleKeyDown, this));
 	this.$el.on('wheel', '.sked-tape__time-frame', $.proxy(this.handleWheel, this));
 	this.$el.on('click', '.sked-tape__intersection', $.proxy(this.handleIntersectionClick, this));
@@ -125,6 +159,22 @@ SkedTape.prototype = {
 	zoomOut: function(dec) {
 		return this.setZoom(this.zoom - (dec || this.zoomStep));
 	},
+	setBlocks: function(blocks, opts) {
+		this.blocksEnabled = true;
+
+		this.blocks = blocks && blocks.map(function(block) {
+			return {
+				id: block.id,
+				start: block.start,
+				end: block.end,
+				color: block.color,
+				name: block.name,
+				location: block.location,
+				userData: block.userData ? $.extend({}, block.userData) : {}
+			};
+		});
+		return this.updateUnlessOption(opts)
+	},
 	locationExists: function(id) {
 		var exists = false;
 		$.each(this.locations, function(i, location) {
@@ -214,16 +264,23 @@ SkedTape.prototype = {
 		var end = entry.end instanceof Date ? entry.end : new Date(entry.end);
 
 		if (!isValidTimeRange(start, end)) {
-			throw new Error('Invalid time range: ' +
+			throw new Error('Invalid time range ('+entry.id+'): ' +
 				JSON.stringify([entry.start, entry.end]));
+		}
+
+		var color = null;
+		if (entry.color) {
+			color = entry.color;
 		}
 
 		var newEvent = {
 			id: ++this.lastEventId,
+			object_id: entry.object_id,
 			name: entry.name,
 			location: entry.location + '',
 			start: start,
 			end: end,
+			color: color,
 			data: entry.data ? $.extend({}, entry.data) : null,
 			url: entry.url || false,
 			className: entry.className || null,
@@ -303,12 +360,31 @@ SkedTape.prototype = {
 		return this;
 	},
 	startAdding: function(dummyEvent) {
+		if (this.isResizing)return;
+
 		this.dummyEvent = dummyEvent;
+		
 		// Place on the last mouse position on the timeline
 		if (this.lastPicked) {
 			this.moveDummyEvent(this.lastPicked);
 			this.updateDummyEvent();
 		}
+
+		return this.rerenderLocations();
+	},
+	addNewEvent: function(dummyEvent) {
+		if (this.isResizing)return;
+
+		this.dummyEvent = dummyEvent;
+		
+		// Place on the last mouse position on the timeline
+		if (this.lastPicked) {
+			this.moveDummyEvent(this.lastPicked);
+			this.updateDummyEvent();
+		}
+
+		this.$el.trigger('event:addingStarted.skedtape');
+
 		return this.rerenderLocations();
 	},
 	cancelAdding: function() {
@@ -481,6 +557,7 @@ SkedTape.prototype = {
 			return a.start.getTime() - b.start.getTime();
 		}, this));
 		this.timeIndicators = {};
+		var blocks = this.blocks;
 		$.each(this.getLocations(), $.proxy(function(i, location) {
 			var $li = $('<li class="sked-tape__event-row"/>')
 				.data('locationId', location.id)
@@ -525,6 +602,21 @@ SkedTape.prototype = {
 					}
 				}
 			}, this);
+
+			blocks.forEach(function(block) {
+				var belongs = block.location == location.id;
+				var visible = block.end > this.start && block.start < this.end;
+
+				if (belongs && visible) {
+					var intersects = false;
+					
+					lastEnd = block.end;
+					lastEndTime = lastEnd.getTime();
+					var $block = this.renderBlock(block).appendTo($li);
+				
+				}
+			}, this);
+
 		}, this));
 		this.renderIntersections();
 		return this.$timeline;
@@ -560,6 +652,49 @@ SkedTape.prototype = {
 				left: this.computeEventOffset(block)
 			})
 			.append($text);
+	},
+	renderBlock: function(block) {
+		// Create event node
+		
+		var $block = $('<div/>');
+		
+		$block.addClass('sked-tape__block');
+		if (block.className) {
+			$block.addClass(block.className);
+		}
+		$block
+			//.toggleClass('sked-tape__block--disabled', !!block.disabled)
+			//.toggleClass('sked-tape__event--active', !!block.active)
+			.attr('title', block.name)
+			.css({
+				textShadow: "2px 2px 1px black",
+				width: this.computeEventWidth(block),
+				left: this.computeEventOffset(block),
+				backgroundImage: "linear-gradient(45deg, "+block.color+" 22.22%, #fff 22.22%, #fff 50%, "+block.color+" 50%, "+block.color+" 72.22%, #fff 72.22%, #fff 100%)",
+  				backgroundSize: "12.73px 12.73px"
+				//background: block.color
+			});
+		// Append the center aligner node with text context
+		var $center = $('<div class="sked-tape__center"/>')
+			.text(block.name)
+			.appendTo($block);
+		
+		// Bind data-*
+		//$block.data($.extend({}, {eventId: event.id}, event.data));
+		// Measure minimum content width to detect whether to attach popover further
+		/*var $loose = $event.clone()
+			.css({
+				width: '',
+				left: '-10000px',
+				top: '-10000px'
+			})
+			.appendTo(document.body);
+		$event.data('min-width', $loose.outerWidth());
+		$loose.remove();*/
+		// Execute the hook
+		//this.postRenderBlock($block, block);
+
+		return $block;
 	},
 	findEventJustBefore: function(event) {
 		var found = null;
@@ -613,7 +748,8 @@ SkedTape.prototype = {
 		this.$dummyEvent[0].className = 'sked-tape__dummy-event ' + (event.className || '');
 		this.$dummyEvent.css({
 			width: this.computeEventWidth(event),
-			left: this.computeEventOffset(event)
+			left: this.computeEventOffset(event),
+			color: "#FF0000"
 		});
 		var leftText = this.format.time(event.start);
 		var rightText = this.format.time(event.end);
@@ -688,12 +824,71 @@ SkedTape.prototype = {
 			.attr('title', event.name)
 			.css({
 				width: this.computeEventWidth(event),
-				left: this.computeEventOffset(event)
+				left: this.computeEventOffset(event),
+				background: event.color
 			});
+
+		var tz = this;
+
+		if (this.editMode == true) {
+			$event.resizable({
+				grid: 5,
+				handles: "e, w",
+				start: function( evt, ui ) {
+					tz.cancelAdding();
+					tz.isResizing = true
+
+					var jqEvent = tz.makeMouseEvent('event:resizeStart.skedtape', evt, {
+						detail: { component: tz, event: event }
+					});
+					tz.$el.trigger(jqEvent, [tz]);
+				},
+				resize: function( evt, ui ) {
+
+				},
+				stop: function( evt, ui ) {
+					tz.isResizing = false
+					
+					var axis = $(this).data('ui-resizable').axis;
+
+					if (axis == "e") {
+						var end = tz.pick(evt).date;
+						if (tz.snapToMins) {
+							var hr = floorHours(end);
+							var left = (end.getTime() - hr.getTime()) / MS_PER_MINUTE;
+							var lower = Math.floor(left / tz.snapToMins) * tz.snapToMins;
+							var min = left - lower < tz.snapToMins / 2 ? lower : lower + tz.snapToMins;
+							end = new Date(hr.getTime() + Math.round(min * MS_PER_MINUTE));
+						}
+						//update the end of the event
+						event.end = end;
+					} else if (axis == "w") {
+						var start = tz.pick(evt).date;
+						if (tz.snapToMins) {
+							var hr = floorHours(start);
+							var left = (start.getTime() - hr.getTime()) / MS_PER_MINUTE;
+							var lower = Math.floor(left / tz.snapToMins) * tz.snapToMins;
+							var min = left - lower < tz.snapToMins / 2 ? lower : lower + tz.snapToMins;
+							start = new Date(hr.getTime() + Math.round(min * MS_PER_MINUTE));
+						}
+						//update the start of the event
+						event.start = start;
+					}
+					tz.updateEvent(event);
+
+					var jqEvent = tz.makeMouseEvent('event:resizeStopped.skedtape', evt, {
+						detail: { component: tz, event: event }
+					});
+
+					tz.$el.trigger(jqEvent, [tz]);
+				},
+			});
+		}
 		// Append the center aligner node with text context
 		var $center = $('<div class="sked-tape__center"/>')
-			.text(event.name)
+			//.text(event.name)
 			.appendTo($event);
+			$center.html($center.html() + event.name);
 		if (this.showEventTime || this.showEventDuration) {
 			var html = $center.html();
 			var duration = this.format.roundDuration(event.end - event.start);
@@ -866,7 +1061,7 @@ SkedTape.prototype = {
 		return events;
 	},
 	pick: function(e) {
-		var scalar = (e.pageX - this.$timeline.offset().left) / this.$timeline.width();
+		var scalar = (e.pageX + this.addEventOffset - this.$timeline.offset().left) / this.$timeline.width();
 		var time = this.start.getTime() + scalar * (this.end.getTime() - this.start.getTime());
 		var locationId;
 		this.$el.find('.sked-tape__event-row').each(function() {
@@ -900,6 +1095,7 @@ SkedTape.prototype = {
 		e = e || {};
 		// Skip if some event is being dragged right now
 		if (this.isAdding()) return;
+		if (this.isResizing) return;
 		var event = this.getEvent(eventId);
 		// Make sure the event is allowed to be draggable
 		var jqEvent = this.makeMouseEvent('event:dragStart.skedtape', e, {
@@ -914,9 +1110,12 @@ SkedTape.prototype = {
 			this.$el.trigger(jqEvent, [this]);
 			// Remove it from the timeline and begin positioning
 			this.removeEvent(eventId);
+
 			this.startAdding({
 				id: event.id,
 				name: event.name,
+				object_id: event.object_id,
+				color: event.color,
 				duration: event.end.getTime() - event.start.getTime(),
 				userData: $.extend({}, event.userData || {}),
 				draggedEvent: event
@@ -926,6 +1125,39 @@ SkedTape.prototype = {
 	handleEventClick: function(e) {
 		var eventId = $(e.currentTarget).data('eventId');
 		var event = this.getEvent(eventId);
+		console.log('click');
+		if (this.isEditMode()) {
+			//this.dragEvent(eventId, e);
+		} else {
+			// Emit an event click event
+			/*var jqEvent = this.makeMouseEvent('event:click.skedtape', e, {
+				detail: { component: this, event: event }
+			});
+			this.$el.trigger(jqEvent, [this]);*/
+		}
+	},
+	handleEventMouseDown: function(e) {
+		if (this.isResizing) return;
+		var eventId = $(e.currentTarget).data('eventId');
+		var event = this.getEvent(eventId);
+		this.addEventOffset = -e.offsetX;
+
+		if ("which" in e)  // Gecko (Firefox), WebKit (Safari/Chrome) & Opera
+        isRightMB = e.which == 3; 
+    	else if ("button" in e)  // IE, Opera 
+        isRightMB = e.button == 2; 
+
+		if (isRightMB) {
+			var jqEvent = this.makeMouseEvent('event:rightClick.skedtape', e, {
+				detail: { component: this, event: event }
+			});
+			this.$el.trigger(jqEvent, [this]);
+			return;
+		}
+		if (e.offsetX < 10 || e.offsetX > e.target.offsetWidth - 10) {
+			return;
+		}
+
 		if (this.isEditMode()) {
 			this.dragEvent(eventId, e);
 		} else {
@@ -988,22 +1220,52 @@ SkedTape.prototype = {
 			// At this step there something may have changed by
 			// the callback above, so do the collision check again.
 			try {
+				var inBlockId = null;
+				//test if we have blocks, and if we are in a block that we are allowed in
+				if (this.blocksEnabled == true) {
+					$.each(this.blocks, $.proxy(function(i, block) {
+						//check if we're in a block
+						if (block.location == event.location && block.start <= event.start && block.end >= event.end) {
+							console.log("in a block");
+							event.color = block.color;
+							inBlockId = block.id;
+							return true;
+						} 
+					}, this));
+
+					if (inBlockId == null) {
+						return false
+					}
+				}
+
 				var newEvent = this.addEvent(event, {preserveId: true, update: true});
 				delete event.duration;
 				delete this.dummyEvent;
 				this.$dummyEvent.remove();
 				delete this.$dummyEvent;
-				var jqEvent = this.makeMouseEvent('event:dragEnded.skedtape', e, {
-					detail: { component: this, event: newEvent }
-				});
-				this.$el.trigger(jqEvent, [this]);
+
+				newEvent.block_id = inBlockId;
+				newEvent.object_id = event.object_id;
+				
+				if (newEvent.object_id == null) {
+					var jqEvent = this.makeMouseEvent('event:addingEnded.skedtape', e, {
+						detail: { component: this, event: newEvent }
+					});
+					this.$el.trigger(jqEvent, [this]);
+				} else {
+					var jqEvent = this.makeMouseEvent('event:dragEnded.skedtape', e, {
+						detail: { component: this, event: newEvent }
+					});
+					this.$el.trigger(jqEvent, [this]);
+				}
+				
 				this.rerenderLocations();
 			}
 			catch (e) {
 				if (e.name !== 'SkedTape.CollisionError') {
 					throw e;
 				}
-				var jqEvent = this.makeMouseEvent('event:dragEndRefused.skedtape', e, {
+				var jqEvent = this.makeMouseEvent('event:addingEndRefused.skedtape', e, {
 					detail: { component: this, event: event }
 				});
 				this.$el.trigger(jqEvent, [this]);
@@ -1181,6 +1443,7 @@ $.fn.skedTape = function(opts) {
 			var objOpts = $.extend({}, $.fn.skedTape.defaults, opts, {
 				el: this
 			});
+			delete objOpts.blocks;
 			delete objOpts.locations;
 			delete objOpts.events;
 			delete objOpts.start;
@@ -1189,7 +1452,11 @@ $.fn.skedTape = function(opts) {
 			obj = new SkedTape(objOpts);
 			opts.start && opts.end && obj.setTimespan(opts.start, opts.end, {update: false});
 			opts.locations && obj.setLocations(opts.locations, {update: false});
+			opts.blocks && obj.setBlocks(opts.blocks, {update: false});
 			opts.events && obj.setEvents(opts.events, {update: false, allowCollisions: true});
+			if (opts.blocksEnabled != null) {
+				obj.blocksEnabled = opts.blocksEnabled;
+			}
 			$(this).data($.fn.skedTape.dataKey, obj);
 			opts.deferRender || obj.render();
 		} else {
@@ -1202,8 +1469,8 @@ $.fn.skedTape = function(opts) {
 					var methods = [
 						'addEvent',  'addEvents', 'removeEvent', 'setEvents',
 						'removeAllEvents', 'enterEditMode', 'leaveEditMode',
-						'startAdding', 'cancelAdding', 'setLocations',
-						'addLocation', 'addLocations', 'removeLocation',
+						'addNewEvent', 'startAdding', 'cancelAdding', 'setLocations',
+						'addLocation', 'addLocations', 'removeLocation', 'setBlocks',
 						'setTimespan', 'setDate', 'zoomIn', 'zoomOut', 'setZoom',
 						'resetZoom', 'render', 'setSnapToMins', 'dragEvent',
 						'updateEvent',
@@ -1358,3 +1625,5 @@ $.fn.skedTape.defaults = {
 $.skedTape = function(opts) {
 	return $('<div/>').skedTape($.extend({}, opts || {}, {deferRender: true}));
 };
+
+}));

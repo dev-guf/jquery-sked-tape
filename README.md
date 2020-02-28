@@ -15,6 +15,7 @@ var $sked = $('#sked').skedTape({
     end: today(12, 0),       // Timeline ends this date-time (UTC)
     showEventTime: true,     // Whether to show event start-end time
     showEventDuration: true, // Whether to show event duration
+    blocksEnabled: true,     // Whether to use blocks where new events can be placed or not
     locations: [
         {id: 1, name: 'San Francisco'}, // required properties only
         {
@@ -26,12 +27,20 @@ var $sked = $('#sked').skedTape({
         },
         ...
     ],
+    blocks: [
+        name: 'Person 1',
+        color: '#FF0000',
+        location: 'london',
+        start: today(4, 00),
+        end: today(8, 00)
+    ],
     events: [
         {
             name: 'Meeting 1',
             location: 'london',
             start: today(4, 15),
-            end: today(7, 30)
+            end: today(7, 30),
+            color: '#FF0000',
         },
         // ...
     ]
@@ -41,6 +50,7 @@ var $sked = $('#sked').skedTape({
 **Available constructor options**:
 - `locations` (_object_) Maps location-id -> location-name.
 - `events` (_Array_) An array of event objects (see description below).
+- `blocks` (_Array_) An array of block objects (see description below).
 - `start`, `end` (_Date_) Timeline is shown between these date-times.
 - `caption` (_string_) The text in left top corner. Default is ''.
 - `maxZoom` (_float_) Self-explanatory. Default is 10.
@@ -70,9 +80,18 @@ var $sked = $('#sked').skedTape({
 - `name` (_string_)
 - `location` (_int|string_) Location id (key in locations object).
 - `start`, `end` (_Date_)
+- `color` ( string )
 - `url` (_string_) If set the entry will be rendered as anchor with href=url.
 - `className` (_string_) Additional class name for stylizing purposes.
 - `disabled` (_bool_) Adds the `sked-tape__event--disabled` class. Default is false.
+- `data` (_object_) The data to set with `$.data()` method. The `eventId` is reserved.
+- `userData` (_object_) Any custom data you may store here.
+
+**Available block object options**:
+- `name` (_string_)
+- `location` (_int|string_) Location id (key in locations object).
+- `start`, `end` (_Date_)
+- `color` ( string )
 - `data` (_object_) The data to set with `$.data()` method. The `eventId` is reserved.
 - `userData` (_object_) Any custom data you may store here.
 
@@ -102,6 +121,10 @@ $sked.on('event:click.skedtape', function(e/*, api*/) {
 - `event:dragEnded.skedtape`
 - `event:dragEndRefused.skedtape`
 - `skedtape:event:dragCanceled`
+- `event:resizeStarted.skedtape`
+- `event:resizeStopped.skedtape`
+- `event:addingStarted.skedtape`
+- `event:addingEnded.skedtape`
 - `skedtape:event:addingCanceled`
 
 **The props in common for all click event/contextmenu events:**

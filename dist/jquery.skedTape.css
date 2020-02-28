@@ -209,6 +209,25 @@
   border: 2px dashed rgba(255, 62, 44, 0.5);
 }
 
+.sked-tape__block {
+  background-color: #EC6A5E;
+  transition: 200ms background-color;
+  top: 1px;
+  bottom: 0;
+  display: block;
+  position: absolute;
+  z-index: 1;
+  opacity: 0.5;
+  white-space: nowrap;
+  overflow: hidden;
+  font-size: 12px;
+  color: white;
+  border: 0px;
+  min-width: 10px;
+  cursor: default;
+  line-height: 16px;
+}
+
 .sked-tape__event {
   background-color: #EC6A5E;
   transition: 200ms background-color;
