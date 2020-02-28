@@ -1237,7 +1237,6 @@ SkedTape.prototype = {
 						return false
 					}
 				}
-
 				var newEvent = this.addEvent(event, {preserveId: true, update: true});
 				delete event.duration;
 				delete this.dummyEvent;
