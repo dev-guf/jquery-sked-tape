@@ -272,6 +272,11 @@ SkedTape.prototype = {
 		if (entry.color) {
 			color = entry.color;
 		}
+		// CHANGE
+		var location = this.locations.find(x => x.id == entry.location);
+		if (location && location.userData.color) {
+			color = location.userData.color;
+		}
 
 		var newEvent = {
 			id: ++this.lastEventId,
@@ -1157,8 +1162,8 @@ SkedTape.prototype = {
 		if (e.offsetX < 10 || e.offsetX > e.target.offsetWidth - 10) {
 			return;
 		}
-
-		if (this.isEditMode()) {
+		// CHANGE
+		if (this.isEditMode() && e.ctrlKey === false) {
 			this.dragEvent(eventId, e);
 		} else {
 			// Emit an event click event
@@ -1201,6 +1206,8 @@ SkedTape.prototype = {
 		this.$el.trigger(jqEvent, [this]);
 	},
 	completeAdding: function(e) {
+		// CHANGE
+		this.addEventOffset = 0;
 		var event = this.dummyEvent;
 		// Check for collisions
 		if (this.collide(event)) {
