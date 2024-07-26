@@ -23,16 +23,6 @@
   },
   "homepage": "https://github.com/dannygrob/jquery-sked-tape#readme",
   "devDependencies": {
-    "gulp": "^4.0.0",
-    "gulp-autoprefixer": "^5.0.0",
-    "gulp-clean-dest": "^0.2.0",
-    "gulp-connect": "^5.5.0",
-    "gulp-if": "^2.0.2",
-    "gulp-notify": "^3.2.0",
-    "gulp-open": "^3.0.1",
-    "gulp-plumber": "^1.2.0",
-    "gulp-sass": "^4.0.1",
-    "gulp-sourcemaps": "^2.6.4",
-    "gulp-wrap": "^0.15.0"
+
   }
 }
