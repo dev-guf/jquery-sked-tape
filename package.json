@@ -22,7 +22,7 @@
     "url": "https://github.com/dannygrob/jquery-sked-tape/issues"
   },
   "homepage": "https://github.com/dannygrob/jquery-sked-tape#readme",
-  "devDependencies": {
+  "dependencies": {
 
   }
 }

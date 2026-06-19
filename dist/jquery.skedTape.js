@@ -855,7 +855,7 @@ SkedTape.prototype = {
 					tz.isResizing = false
 					
 					var axis = $(this).data('ui-resizable').axis;
-
+          var minMs = (tz.minEventMinutes || tz.snapToMins) * MS_PER_MINUTE;
 					if (axis == "e") {
 						var end = tz.pick(evt).date;
 						if (tz.snapToMins) {
@@ -866,6 +866,9 @@ SkedTape.prototype = {
 							end = new Date(hr.getTime() + Math.round(min * MS_PER_MINUTE));
 						}
 						//update the end of the event
+            if (end.getTime() - event.start.getTime() < minMs) {
+                end = new Date(event.start.getTime() + minMs);
+            }
 						event.end = end;
 					} else if (axis == "w") {
 						var start = tz.pick(evt).date;
@@ -877,6 +880,9 @@ SkedTape.prototype = {
 							start = new Date(hr.getTime() + Math.round(min * MS_PER_MINUTE));
 						}
 						//update the start of the event
+            if (event.end.getTime() - start.getTime() < minMs) {
+                start = new Date(event.end.getTime() - minMs);
+            }
 						event.start = start;
 					}
 					tz.updateEvent(event);
@@ -1315,7 +1321,7 @@ SkedTape.prototype = {
 			var hr = floorHours(start);
 			var left = (start.getTime() - hr.getTime()) / MS_PER_MINUTE;
 			var lower = Math.floor(left / this.snapToMins) * this.snapToMins;
-			var min = left - lower < this.snapToMins / 2 ? lower : lower + this.snapToMins;
+      var min = lower;   // immer abrunden -> Balken beginnt in der angeklickten Zelle
 			start = new Date(hr.getTime() + Math.round(min * MS_PER_MINUTE));
 		}
 		$.extend(event, {
